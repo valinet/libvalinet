@@ -44,8 +44,8 @@ DWORD VnDownloadFile(
                 hConnect,
                 "GET",
                 path,
-                referrer,
                 NULL,
+                referrer,
                 NULL,
                 NULL,
                 NULL
