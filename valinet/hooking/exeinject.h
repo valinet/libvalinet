@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <Windows.h>
 #include <tlhelp32.h>
+#include <conio.h>
 
 #define MODULE_ARRAY_INITIAL_SIZE           100
 #define WM_APP_CRASHED                      WM_USER + 1
@@ -32,7 +33,7 @@
 #define ERROR_FAILED_TO_CALL_FREELIBRARY    0x500
 #define ERROR_FREELIBRARY_FAILED            0x501
 
-LRESULT CALLBACK libvalinet_hooking_exeinject_WindowProc(
+LRESULT CALLBACK VnWindowProc(
     HWND hWnd,
     UINT uMsg,
     WPARAM wParam,
@@ -193,7 +194,11 @@ int VnInjectAndMonitorProcess(
     LPTHREAD_START_ROUTINE lpCrashOrFailureCallback,
     HINSTANCE hInstance,
     FILE* stream,
-    DWORD dwRestartDelay
+    DWORD dwRestartDelay,
+    LRESULT (*CustomWindowProc)(HWND, UINT, WPARAM, LPARAM),
+    BOOL bWaitForProcess,
+    DWORD dwCheckDelay,
+    DWORD dwStartupDelay
 )
 {
     SIZE_T i = 0;
@@ -356,57 +361,82 @@ int VnInjectAndMonitorProcess(
         L"3. FreeLibrary address: %d\n",
         hAdrFreeLibrary
     );
-
     // Repeatedly inject application
     while (TRUE)
     {
         // Step 4: Find application.exe
-        stProcessEntry.dwSize = sizeof(PROCESSENTRY32);
-        hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
-        if (Process32First(hSnapshot, &stProcessEntry) == TRUE)
+        do
         {
-            while (Process32Next(hSnapshot, &stProcessEntry) == TRUE)
+            stProcessEntry.dwSize = sizeof(PROCESSENTRY32);
+            hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+            if (Process32First(hSnapshot, &stProcessEntry) == TRUE)
             {
-                if (!wcscmp(stProcessEntry.szExeFile, szProcessName))
+                while (Process32Next(hSnapshot, &stProcessEntry) == TRUE)
                 {
-                    dwProcessId = stProcessEntry.th32ProcessID;
-                    hProcess = OpenProcess(
-                        PROCESS_ALL_ACCESS,
-                        FALSE,
-                        dwProcessId
-                    );
-                    if (hProcess == NULL)
+                    if (!wcscmp(stProcessEntry.szExeFile, szProcessName))
                     {
+                        dwProcessId = stProcessEntry.th32ProcessID;
+                        hProcess = OpenProcess(
+                            PROCESS_ALL_ACCESS,
+                            FALSE,
+                            dwProcessId
+                        );
+                        if (hProcess == NULL)
+                        {
+                            if (stream)
+                            {
+                                fprintf(
+                                    stream,
+                                    "4. ERROR: Cannot get handle to application.\n"
+                                );
+                            }
+                            return ERROR_APP_OPENPROCESS;
+                        }
                         if (stream)
                         {
                             fprintf(
                                 stream,
-                                "4. ERROR: Cannot get handle to application.\n"
+                                "4. Found application, PID: %d\n",
+                                dwProcessId
                             );
                         }
-                        return ERROR_APP_OPENPROCESS;
+                        break;
                     }
-                    fprintf(
-                        stream,
-                        "4. Found application, PID: %d\n",
-                        dwProcessId
-                    );
+                }
+            }
+            CloseHandle(hSnapshot);
+            if (bWaitForProcess)
+            {
+                if (dwProcessId == 0)
+                {
+                    if (stream)
+                    {
+                        fprintf(stream, "4. Waiting for Explorer to start...\n");
+                    }
+                }
+                else
+                {
                     break;
                 }
             }
-        }
-        CloseHandle(hSnapshot);
-        if (dwProcessId == 0)
-        {
-            if (stream)
+            else
             {
-                fprintf(
-                    stream,
-                    "4. ERROR: Application is not running.\n"
-                );
+                if (dwProcessId == 0)
+                {
+                    if (stream)
+                    {
+                        fprintf(
+                            stream,
+                            "4. ERROR: Application is not running.\n"
+                        );
+                    }
+                    return ERROR_APP_NOT_RUNNING;
+                }
             }
-            return ERROR_APP_NOT_RUNNING;
+            Sleep(dwCheckDelay);
         }
+        while (dwProcessId == 0);
+        Sleep(dwStartupDelay);
 
         // Step 5: Write path to library in application's memory
         pLibRemote = VirtualAllocEx(
@@ -991,7 +1021,7 @@ int VnInjectAndMonitorProcess(
 
         // Step 10: Register and create window
         wc.style = CS_DBLCLKS;
-        wc.lpfnWndProc = libvalinet_hooking_exeinject_WindowProc;
+        wc.lpfnWndProc = CustomWindowProc ? CustomWindowProc : VnWindowProc;
         wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
         wc.hInstance = hInstance;
         wc.lpszClassName = szClassName;
