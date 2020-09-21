@@ -15,7 +15,6 @@
 #pragma comment(lib, "dbghelp.lib")
 #include <Shlwapi.h>
 #pragma comment(lib, "Shlwapi.lib")
-#include <conio.h>
 
 #define ASSERT(x, m, ...)                   if (!(x)) { fprintf(stderr, m, __VA_ARGS__);    \
                                                 exit(-1); }
@@ -490,13 +489,13 @@ INT VnDownloadSymbols(
     }
     if (VnDownloadFile(
         szLibPath,
-        VN_PDB_SYMBOL_HOSTNAME,
+        (char*)VN_PDB_SYMBOL_HOSTNAME,
         url,
-        VN_PDB_USER_AGENT,
+        (char*)VN_PDB_USER_AGENT,
         INTERNET_DEFAULT_HTTP_PORT,
         INTERNET_SERVICE_HTTP,
         NULL,
-        VN_PDB_FORM_HEADERS,
+        (char*)VN_PDB_FORM_HEADERS,
         VN_PDB_DOWNLOAD_FILE_BUFFER_SIZE
     ))
     {
