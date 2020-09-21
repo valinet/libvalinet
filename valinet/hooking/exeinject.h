@@ -119,7 +119,10 @@ DWORD libvalinet_hooking_exeinject_ExitHandler(
         );
     }
 
-    lpCustomExitHandler(NULL);
+    if (lpCustomExitHandler)
+    {
+        lpCustomExitHandler(NULL);
+    }
 
     return ERROR_SUCCESS;
 }
