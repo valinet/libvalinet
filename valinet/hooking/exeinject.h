@@ -75,7 +75,8 @@ DWORD libvalinet_hooking_exeinject_ExitHandler(
     HANDLE hProcess,
     HMODULE hMod,
     uintptr_t hInjection,
-    FILE* stream
+    FILE* stream,
+    LPTHREAD_START_ROUTINE lpCustomExitHandler
 )
 {
     HANDLE hThread = NULL;
@@ -117,6 +118,8 @@ DWORD libvalinet_hooking_exeinject_ExitHandler(
             "E. Successfully unhooked application.\n"
         );
     }
+
+    lpCustomExitHandler(NULL);
 
     return ERROR_SUCCESS;
 }
@@ -195,10 +198,11 @@ int VnInjectAndMonitorProcess(
     HINSTANCE hInstance,
     FILE* stream,
     DWORD dwRestartDelay,
-    LRESULT (*CustomWindowProc)(HWND, UINT, WPARAM, LPARAM),
+    LRESULT (*lpWindowProc)(HWND, UINT, WPARAM, LPARAM),
     BOOL bWaitForProcess,
     DWORD dwCheckDelay,
-    DWORD dwStartupDelay
+    DWORD dwStartupDelay,
+    LPTHREAD_START_ROUTINE lpCustomExitHandler
 )
 {
     SIZE_T i = 0;
@@ -1021,7 +1025,7 @@ int VnInjectAndMonitorProcess(
 
         // Step 10: Register and create window
         wc.style = CS_DBLCLKS;
-        wc.lpfnWndProc = CustomWindowProc ? CustomWindowProc : VnWindowProc;
+        wc.lpfnWndProc = lpWindowProc ? lpWindowProc : VnWindowProc;
         wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
         wc.hInstance = hInstance;
         wc.lpszClassName = szClassName;
@@ -1056,7 +1060,8 @@ int VnInjectAndMonitorProcess(
                 hProcess, 
                 hMod, 
                 hInjection,
-                stream
+                stream,
+                lpCustomExitHandler
             );
             return ERROR_CREATE_MESSAGE_WINDOW;
         }
@@ -1092,7 +1097,8 @@ int VnInjectAndMonitorProcess(
                 hProcess, 
                 hMod, 
                 hInjection,
-                stream
+                stream,
+                lpCustomExitHandler
             );
             return ERROR_REGISTER_APP_WATCH;
         }
@@ -1120,7 +1126,8 @@ int VnInjectAndMonitorProcess(
                     hProcess, 
                     hMod, 
                     hInjection,
-                    stream
+                    stream,
+                    lpCustomExitHandler
                 );
                 return ERROR_MESSAGE_QUEUE;
             }
@@ -1143,7 +1150,8 @@ int VnInjectAndMonitorProcess(
                 hProcess, 
                 hMod, 
                 hInjection,
-                stream
+                stream,
+                lpCustomExitHandler
             );
             return ERROR_SUCCESS;
         }
