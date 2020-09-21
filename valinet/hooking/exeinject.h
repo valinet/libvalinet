@@ -1,37 +1,36 @@
-#ifndef EXEINJECT_H_
-#define EXEINJECT_H_
-
+#ifndef LIBVALINET_HOOKING_EXEINJECT_H_
+#define LIBVALINET_HOOKING_EXEINJECT_H_
 #include <stdio.h>
 #include <Windows.h>
 #include <tlhelp32.h>
 
 #define MODULE_ARRAY_INITIAL_SIZE           100
-#define WM_DWM_CRASHED                      WM_USER + 1
+#define WM_APP_CRASHED                      WM_USER + 1
 #define ERROR_LOAD_LIBRARY                  0x2
 #define ERROR_NO_MAIN_IN_INJECTION_LIB      0x21
 #define ERROR_GETMODULEHANDLE_KERNEL32      0x3
 #define ERROR_GETPROCADDRESS_LOADLIBRARYW   0x31
 #define ERROR_GETPROCADDRESS_FREELIBRARY    0x32
-#define ERROR_DWM_NOT_RUNNING               0x4
-#define ERROR_DWM_OPENPROCESS               0x41
-#define ERROR_DWM_VIRTUALALLOC              0x5
-#define ERROR_DWM_WRITEPROCESSMEMORY        0x51
+#define ERROR_APP_NOT_RUNNING               0x4
+#define ERROR_APP_OPENPROCESS               0x41
+#define ERROR_APP_VIRTUALALLOC              0x5
+#define ERROR_APP_WRITEPROCESSMEMORY        0x51
 #define ERROR_FAILED_TO_INJECT              0x6
 #define ERROR_FAILED_TO_RUN_ENTRY_POINT     0x61
-#define ERROR_CANNOT_FIND_LIBRARY_IN_DWM    0x8
+#define ERROR_CANNOT_FIND_LIBRARY_IN_APP    0x8
 #define ERROR_MODULE_ARRAY_ALLOC            0x81
-#define ERROR_DWM_MODULE_ENUM               0x82
+#define ERROR_APP_MODULE_ENUM               0x82
 #define ERROR_MODULE_ARRAY_REALLOC          0x83
 #define ERROR_CANNOT_GET_ADDRESS_MODULE     0x84
 #define ERROR_CANNOT_RUN_INJECTION_MAIN     0x91
 #define ERROR_CANNOT_DETERMINE_STATUS_DLL   0x93
 #define ERROR_CREATE_MESSAGE_WINDOW         0x10
-#define ERROR_REGISTER_DWM_WATCH            0x11
+#define ERROR_REGISTER_APP_WATCH            0x11
 #define ERROR_REGISTER_EXIT_HANDLER         0x12
 #define ERROR_MESSAGE_QUEUE                 0x13
-#define ERROR_DWM_CRASHED                   0x222
-#define ERROR_FAILED_TO_CALL_FREELIBRARY    0x400
-#define ERROR_FREELIBRARY_FAILED            0x401
+#define ERROR_APP_CRASHED                   0x222
+#define ERROR_FAILED_TO_CALL_FREELIBRARY    0x500
+#define ERROR_FREELIBRARY_FAILED            0x501
 
 LRESULT CALLBACK libvalinet_hooking_exeinject_WindowProc(
     HWND hWnd,
@@ -46,8 +45,13 @@ LRESULT CALLBACK libvalinet_hooking_exeinject_WindowProc(
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
-    case WM_DWM_CRASHED:
-        PostMessage(hWnd, WM_QUIT, ERROR_DWM_CRASHED, 0);
+    case WM_APP_CRASHED:
+        PostMessage(
+            hWnd, 
+            WM_QUIT, 
+            ERROR_APP_CRASHED, 
+            0
+        );
         break;
     }
     return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -58,7 +62,12 @@ VOID CALLBACK libvalinet_hooking_exeinject_WaitForDWMToCrash(
     _In_ BOOLEAN TimerOrWaitFired
 )
 {
-    SendMessage((HWND)(lpParameter), WM_DWM_CRASHED, 0, 0);
+    SendMessage(
+        (HWND)(lpParameter), 
+        WM_APP_CRASHED, 
+        0, 
+        0
+    );
 }
 
 DWORD libvalinet_hooking_exeinject_ExitHandler(
@@ -94,7 +103,7 @@ DWORD libvalinet_hooking_exeinject_ExitHandler(
         {
             fprintf(
                 stream, 
-                "E. Error while unhooking DWM (%d).\n", 
+                "E. Error while unhooking application (%d).\n", 
                 dwThreadExitCode
             );
         }
@@ -104,7 +113,7 @@ DWORD libvalinet_hooking_exeinject_ExitHandler(
     {
         fprintf(
             stream, 
-            "E. Successfully unhooked DWM.\n"
+            "E. Successfully unhooked application.\n"
         );
     }
 
@@ -175,7 +184,7 @@ DWORD libvalinet_hooking_exeinject_FreeRemoteLibrary(
     return ERROR_SUCCESS;
 }
 
-int InjectAndMonitorProcess(
+int VnInjectAndMonitorProcess(
     TCHAR* szLibPath,
     DWORD dwLibPathSize,
     const TCHAR* szProcessName,
@@ -239,11 +248,11 @@ int InjectAndMonitorProcess(
         and sp, 0xffc0
 
         ; Call LoadLibraryA
-        mov rcx, 0x4141414141414141    ; Ptr to string of library, set by injector
-        mov rdx, 0x4141414141414141    ; Address of LoadLibrary, set by injector
+        mov rcx, 0x4141414141414141 ; Ptr to string of library, set by injector
+        mov rdx, 0x4141414141414141 ; Address of LoadLibrary, set by injector
         call rdx
 
-        mov rdx, 0x4141414141414141    ; Ptr to save result, set by injector
+        mov rdx, 0x4141414141414141 ; Ptr to save result, set by injector
         mov [rdx], rax
 
         ; Fix stack
@@ -347,10 +356,10 @@ int InjectAndMonitorProcess(
         hAdrFreeLibrary
     );
 
-    // Repeatedly inject DWM
+    // Repeatedly inject application
     while (TRUE)
     {
-        // Step 4: Find DWM.exe
+        // Step 4: Find application.exe
         stProcessEntry.dwSize = sizeof(PROCESSENTRY32);
         hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
         if (Process32First(hSnapshot, &stProcessEntry) == TRUE)
@@ -371,14 +380,14 @@ int InjectAndMonitorProcess(
                         {
                             fprintf(
                                 stream,
-                                "4. ERROR: Cannot get handle to dwm.exe.\n"
+                                "4. ERROR: Cannot get handle to application.\n"
                             );
                         }
-                        return ERROR_DWM_OPENPROCESS;
+                        return ERROR_APP_OPENPROCESS;
                     }
                     fprintf(
                         stream,
-                        L"4. Found Desktop Window manager, PID: %d\n",
+                        L"4. Found application, PID: %d\n",
                         dwProcessId
                     );
                     break;
@@ -392,13 +401,13 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "4. ERROR: Desktop Window Manager is not running.\n"
+                    "4. ERROR: Application is not running.\n"
                 );
             }
-            return ERROR_DWM_NOT_RUNNING;
+            return ERROR_APP_NOT_RUNNING;
         }
 
-        // Step 5: Write path to library in DWM's memory
+        // Step 5: Write path to library in application's memory
         pLibRemote = VirtualAllocEx(
             hProcess,
             NULL,
@@ -412,10 +421,10 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "5. ERROR: Cannot alloc memory in DWM.\n"
+                    "5. ERROR: Cannot alloc memory in application.\n"
                 );
             }
-            return ERROR_DWM_VIRTUALALLOC;
+            return ERROR_APP_VIRTUALALLOC;
         }
         bResult = WriteProcessMemory(
             hProcess,
@@ -431,7 +440,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "5. ERROR: Cannot write memory in DWM.\n"
+                    "5. ERROR: Cannot write memory in application.\n"
                 );
             }
 
@@ -441,18 +450,18 @@ int InjectAndMonitorProcess(
                 0,
                 MEM_RELEASE
             );
-            return ERROR_DWM_WRITEPROCESSMEMORY;
+            return ERROR_APP_WRITEPROCESSMEMORY;
         }
         if (stream)
         {
             fprintf(
                 stream,
-                "5. Wrote library path in DWM's memory.\n"
+                "5. Wrote library path in application's memory.\n"
             );
         }
 
 #ifdef _WIN64
-        // Step 6: Write shell code to DWM's memory
+        // Step 6: Write shell code to application's memory
         pShellCode = VirtualAllocEx(
             hProcess,
             NULL,
@@ -466,7 +475,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "6. ERROR: Cannot alloc memory in DWM.\n"
+                    "6. ERROR: Cannot alloc memory in application.\n"
                 );
             }
             VirtualFreeEx(
@@ -475,7 +484,7 @@ int InjectAndMonitorProcess(
                 0,
                 MEM_RELEASE
             );
-            return ERROR_DWM_VIRTUALALLOC;
+            return ERROR_APP_VIRTUALALLOC;
         }
         // Address of string containing path of module to load
         *((uintptr_t*)(shellCode + 14)) = (uintptr_t)pLibRemote;
@@ -498,7 +507,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "6. ERROR: Cannot write memory in DWM.\n"
+                    "6. ERROR: Cannot write memory in application.\n"
                 );
             }
             VirtualFreeEx(
@@ -513,13 +522,13 @@ int InjectAndMonitorProcess(
                 0,
                 MEM_RELEASE
             );
-            return ERROR_DWM_WRITEPROCESSMEMORY;
+            return ERROR_APP_WRITEPROCESSMEMORY;
         }
         if (stream)
         {
             fprintf(
                 stream, 
-                "6. Wrote shell code in DWM's memory.\n"
+                "6. Wrote shell code in application's memory.\n"
             );
         }
 
@@ -539,7 +548,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "7. ERROR: Failed to inject library into DWM.\n"
+                    "7. ERROR: Failed to inject library into application.\n"
                 );
             }
             VirtualFreeEx(
@@ -570,7 +579,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream, 
-                    "7. ERROR: Failed to run lib entry point in DWM.\n"
+                    "7. ERROR: Failed to run lib entry point in application.\n"
                 );
             }
             bErr = TRUE;
@@ -581,7 +590,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream, 
-                    "7. Successfully injected library into DWM.\n"
+                    "7. Successfully injected library into application.\n"
                 );
             }
         }
@@ -646,7 +655,7 @@ int InjectAndMonitorProcess(
             return ERROR_FAILED_TO_RUN_ENTRY_POINT;
         }
 #else
-        // Step 6: Load library in DWM
+        // Step 6: Load library in application
         hThread = CreateRemoteThread(
             hProcess,
             NULL,
@@ -662,7 +671,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream, 
-                    "6. ERROR: Failed to inject library into DWM.\n"
+                    "6. ERROR: Failed to inject library into application.\n"
                 );
             }
             return ERROR_FAILED_TO_INJECT;
@@ -681,7 +690,8 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "6. ERROR: Failed to run library entry point in DWM.\n"
+                    "6. ERROR: Failed to run library entry point in "
+                    "application.\n"
                 );
             }
             return ERROR_FAILED_TO_RUN_ENTRY_POINT;
@@ -691,11 +701,11 @@ int InjectAndMonitorProcess(
         {
             fprintf(
                 stream,
-                "6. Successfully injected library into DWM.\n"
+                "6. Successfully injected library into application.\n"
             );
         }
 
-        // Step 7: Free path from DWM's memory
+        // Step 7: Free path from application's memory
         VirtualFreeEx(
             hProcess,
             (LPVOID)pLibRemote,
@@ -706,11 +716,11 @@ int InjectAndMonitorProcess(
         {
             fprintf(
                 stream,
-                "7. Freed path from DWM's memory.\n"
+                "7. Freed path from application's memory.\n"
             );
         }
 
-        // Step 8: Get address of library in DWM's memory
+        // Step 8: Get address of library in application's memory
         // This is actually optional, but application is not tested without
         hModuleArrayInitialBytes = hModuleArrayInitialBytesInitial;
         hMods = (HMODULE*)calloc(
@@ -754,7 +764,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "8. ERROR: Unable to enum modules in DWM.\n"
+                    "8. ERROR: Unable to enum modules in application.\n"
                 );
             }
 
@@ -814,7 +824,7 @@ int InjectAndMonitorProcess(
                 {
                     fprintf(
                         stream,
-                        "8. ERROR: Unable to enum modules in DWM.\n"
+                        "8. ERROR: Unable to enum modules in application.\n"
                     );
                 }
 
@@ -868,7 +878,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "8. ERROR: Cannot find library in DWM's memory.\n"
+                    "8. ERROR: Cannot find library in application's memory.\n"
                 );
             }
 
@@ -886,7 +896,7 @@ int InjectAndMonitorProcess(
         }
 
         wprintf(
-            L"8. Found library in DWM's memory (%d/%d).\n",
+            L"8. Found library in application's memory (%d/%d).\n",
             i,
             hModuleArrayBytesNeeded / sizeof(HMODULE)
         );
@@ -957,26 +967,17 @@ int InjectAndMonitorProcess(
         }
         if (dwThreadExitCode)
         {
-            if (dwThreadExitCode = lpCrashOrFailureCallback((LPVOID)dwThreadExitCode))
+            if (dwRet = 
+                lpCrashOrFailureCallback((LPVOID)dwThreadExitCode))
             {
-                if (dwRet = libvalinet_hooking_exeinject_FreeRemoteLibrary(
-                    hProcess, 
-                    hMod, 
-                    hAdrFreeLibrary,
-                    stream
-                ))
-                {
-                    TerminateProcess(hProcess, 0);
-                    return dwRet;
-                }
-                return dwThreadExitCode;
+                return dwRet;
             }
         }
         if (stream)
         {
             fprintf(
                 stream, 
-                "9. Successfully hooked DWM.\n"
+                "9. Successfully hooked application.\n"
             );
         }
 
@@ -1030,7 +1031,7 @@ int InjectAndMonitorProcess(
             );
         }
 
-        // Step 11: Listen for DWM crashes
+        // Step 11: Listen for application crashes
         RegisterWaitForSingleObject(
             &hWaitObject,
             hProcess,
@@ -1046,7 +1047,7 @@ int InjectAndMonitorProcess(
             {
                 fprintf(
                     stream,
-                    "11. Unable to register for watching DWM.\n"
+                    "11. Unable to register for watching application.\n"
                 );
             }
             libvalinet_hooking_exeinject_ExitHandler(
@@ -1055,13 +1056,13 @@ int InjectAndMonitorProcess(
                 hInjection,
                 stream
             );
-            return ERROR_REGISTER_DWM_WATCH;
+            return ERROR_REGISTER_APP_WATCH;
         }
         if (stream)
         {
             fprintf(
                 stream,
-                "11. Registered for watching DWM.\n"
+                "11. Registered for watching application.\n"
             );
         }
 
@@ -1091,7 +1092,7 @@ int InjectAndMonitorProcess(
                 DispatchMessage(&msg);
             }
         }
-        if (msg.wParam != ERROR_DWM_CRASHED)
+        if (msg.wParam != ERROR_APP_CRASHED)
         {
             if (stream)
             {
@@ -1117,14 +1118,13 @@ int InjectAndMonitorProcess(
         {
             fprintf(
                 stream,
-                "DWM was restarted, rehooking...\n"
+                "Application was restarted, rehooking...\n"
             );
         }
 
-        // wait a bit for DWM to respawn
+        // wait a bit for application to respawn
         Sleep(dwRestartDelay);
     }
-
     return ERROR_SUCCESS;
 }
 
