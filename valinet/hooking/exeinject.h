@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <Windows.h>
 #include <tlhelp32.h>
-#include <conio.h>
 
 #define MODULE_ARRAY_INITIAL_SIZE           100
 #define WM_APP_CRASHED                      WM_USER + 1
