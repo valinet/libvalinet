@@ -186,8 +186,8 @@ DWORD libvalinet_hooking_exeinject_FreeRemoteLibrary(
 
 int VnInjectAndMonitorProcess(
     TCHAR* szLibPath,
-    char* entryPoint,
     DWORD dwLibPathSize,
+    char* entryPoint,
     const TCHAR* szProcessName,
     const TCHAR* szClassName,
     LPTHREAD_START_ROUTINE lpCrashOrFailureCallback,
