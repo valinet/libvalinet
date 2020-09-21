@@ -186,6 +186,7 @@ DWORD libvalinet_hooking_exeinject_FreeRemoteLibrary(
 
 int VnInjectAndMonitorProcess(
     TCHAR* szLibPath,
+    char* entryPoint,
     DWORD dwLibPathSize,
     const TCHAR* szProcessName,
     const TCHAR* szClassName,
@@ -282,7 +283,7 @@ int VnInjectAndMonitorProcess(
     }
     hInjectionMainFunc = GetProcAddress(
         hInjectionDll,
-        "main"
+        entryPoint
     );
     if (hInjectionMainFunc == NULL)
     {
