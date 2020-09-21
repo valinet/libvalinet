@@ -388,7 +388,7 @@ int VnInjectAndMonitorProcess(
                     }
                     fprintf(
                         stream,
-                        L"4. Found application, PID: %d\n",
+                        "4. Found application, PID: %d\n",
                         dwProcessId
                     );
                     break;
