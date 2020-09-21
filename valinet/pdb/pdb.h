@@ -351,14 +351,14 @@ INT VnDownloadSymbols(
     );
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        return -1;
+        return 1;
     }
 
     hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
     if (hFileMapping == 0)
     {
         CloseHandle(hFile);
-        return -1;
+        return 2;
     }
 
     lpFileBase = MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
@@ -366,7 +366,7 @@ INT VnDownloadSymbols(
     {
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
-        return -1;
+        return 3;
     }
 
     baseImage = (PBYTE)lpFileBase;
@@ -376,7 +376,7 @@ INT VnDownloadSymbols(
         UnmapViewOfFile(lpFileBase);
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
-        return -1;
+        return 4;
     }
 
 #ifdef _WIN64
@@ -389,14 +389,14 @@ INT VnDownloadSymbols(
         UnmapViewOfFile(lpFileBase);
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
-        return -1;
+        return 5;
     }
     if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG].VirtualAddress == 0)
     {
         UnmapViewOfFile(lpFileBase);
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
-        return -1;
+        return 6;
     }
     cbDebug = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG].Size;
     ptr = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG].VirtualAddress;
@@ -462,19 +462,8 @@ INT VnDownloadSymbols(
         UnmapViewOfFile(lpFileBase);
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
-        return -1;
+        return 7;
     }
-    GetModuleFileNameA(
-        hModule,
-        szLibPath,
-        _MAX_PATH
-    );
-    PathRemoveFileSpecA(szLibPath);
-    strcat_s(
-        szLibPath,
-        sizeLibPath,
-        "\\symbols\\"
-    );
     strcat_s(
         szLibPath,
         sizeLibPath,
@@ -487,7 +476,7 @@ INT VnDownloadSymbols(
     {
         DeleteFileA(szLibPath);
     }
-    if (VnDownloadFile(
+    return VnDownloadFile(
         szLibPath,
         (char*)VN_PDB_SYMBOL_HOSTNAME,
         url,
@@ -497,10 +486,7 @@ INT VnDownloadSymbols(
         NULL,
         (char*)VN_PDB_FORM_HEADERS,
         VN_PDB_DOWNLOAD_FILE_BUFFER_SIZE
-    ))
-    {
-        return -1;
-    }
+    );
     return 0;
 }
 #endif
