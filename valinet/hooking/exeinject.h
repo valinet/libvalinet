@@ -5,7 +5,7 @@
 #include <tlhelp32.h>
 
 #define MODULE_ARRAY_INITIAL_SIZE           100
-#define WM_APP_CRASHED                      WM_USER + 1
+#define WM_APP_CRASHED                      WM_USER + 100
 #define ERROR_LOAD_LIBRARY                  0x2
 #define ERROR_NO_MAIN_IN_INJECTION_LIB      0x21
 #define ERROR_GETMODULEHANDLE_KERNEL32      0x3
@@ -204,7 +204,14 @@ int VnInjectAndMonitorProcess(
     BOOL bWaitForProcess,
     DWORD dwCheckDelay,
     DWORD dwStartupDelay,
-    LPTHREAD_START_ROUTINE lpCustomExitHandler
+    LPTHREAD_START_ROUTINE lpCustomExitHandler,
+    LPHANDLE lphProcess,
+    HMODULE* lphMod,
+    LPVOID* lphInjection,
+    int* messages,
+    DWORD messagesSize,
+    HWND* lphwnd,
+    LPVOID* lpParam
 )
 {
     SIZE_T i = 0;
@@ -308,6 +315,10 @@ int VnInjectAndMonitorProcess(
         return ERROR_NO_MAIN_IN_INJECTION_LIB;
     }
     hInjection = (uintptr_t)(hInjectionMainFunc) - (uintptr_t)(hInjectionDll);
+    if (lphInjection)
+    {
+        *lphInjection = hInjection;
+    }
     FreeLibrary(hInjectionDll);
     wprintf(
         L"2. Hook Library Entry Point: 0x%x\n",
@@ -387,6 +398,10 @@ int VnInjectAndMonitorProcess(
                             FALSE,
                             dwProcessId
                         );
+                        if (lphProcess)
+                        {
+                            *lphProcess = hProcess;
+                        }
                         if (hProcess == NULL)
                         {
                             if (stream)
@@ -665,6 +680,10 @@ int VnInjectAndMonitorProcess(
             TerminateProcess(hProcess, 0);
             return ERROR_CANNOT_GET_ADDRESS_MODULE;
         }
+        if (lphMod)
+        {
+            *lphMod = hMod;
+        }
         VirtualFreeEx(
             hProcess,
             (LPVOID)pLibRemote,
@@ -734,6 +753,10 @@ int VnInjectAndMonitorProcess(
             return ERROR_FAILED_TO_RUN_ENTRY_POINT;
         }
         hMod = (HMODULE)dwThreadExitCode;
+        if (lphMod)
+        {
+            *lphMod = hMod;
+        }
         if (stream)
         {
             fprintf(
@@ -939,93 +962,14 @@ int VnInjectAndMonitorProcess(
         );
 
         hMod = hMods[i];
+        if (lphMod)
+        {
+            *lphMod = hMod;
+        }
         free(hMods);
 #endif
 
-        // Step 9: Run DLL's entry point
-        hThread = CreateRemoteThread(
-            hProcess,
-            NULL,
-            0,
-            (LPTHREAD_START_ROUTINE)((uintptr_t)hMod + (uintptr_t)hInjection),
-            NULL,
-            0,
-            NULL
-        );
-        if (hThread == NULL)
-        {
-            if (stream)
-            {
-                fprintf(
-                    stream,
-                    "9. ERROR: Cannot execute injection entry point.\n"
-                );
-            }
-            if (dwRet = libvalinet_hooking_exeinject_FreeRemoteLibrary(
-                hProcess, 
-                hMod, 
-                hAdrFreeLibrary,
-                stream
-            ))
-            {
-                TerminateProcess(hProcess, 0);
-                return dwRet;
-            }
-            return ERROR_CANNOT_RUN_INJECTION_MAIN;
-        }
-        WaitForSingleObject(
-            hThread,
-            INFINITE
-        );
-        bResult = GetExitCodeThread(
-            hThread,
-            &dwThreadExitCode
-        );
-        if (!bResult)
-        {
-            if (stream)
-            {
-                fprintf(
-                    stream,
-                    "9. ERROR: Cannot determine status of injected DLL.\n"
-                );
-            }
-            if (dwRet = libvalinet_hooking_exeinject_FreeRemoteLibrary(
-                hProcess, 
-                hMod, 
-                hAdrFreeLibrary,
-                stream
-            ))
-            {
-                TerminateProcess(hProcess, 0);
-                return dwRet;
-            }
-            return ERROR_CANNOT_DETERMINE_STATUS_DLL;
-        }
-        if (dwThreadExitCode)
-        {
-            if (lpCrashOrFailureCallback != NULL)
-            {
-                if (dwRet =
-                    lpCrashOrFailureCallback((LPVOID)dwThreadExitCode))
-                {
-                    return dwRet;
-                }
-            }
-            else
-            {
-                return dwThreadExitCode;
-            }
-        }
-        if (stream)
-        {
-            fprintf(
-                stream, 
-                "9. Successfully hooked application.\n"
-            );
-        }
-
-        // Step 10: Register and create window
+        // Step 9: Register and create window
         wc.style = CS_DBLCLKS;
         wc.lpfnWndProc = lpWindowProc ? lpWindowProc : VnWindowProc;
         wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
@@ -1073,6 +1017,100 @@ int VnInjectAndMonitorProcess(
                 stream,
                 "10. Successfully created message window (%d).\n",
                 hWnd
+            );
+        }
+        for (i = 0; i < messagesSize; ++i)
+        {
+            ChangeWindowMessageFilter(
+                messages[i], 
+                MSGFLT_ADD
+            );
+        }
+        if (lphwnd)
+        {
+            *lphwnd = hWnd;
+        }
+
+        // Step 10: Run DLL's entry point
+        hThread = CreateRemoteThread(
+            hProcess,
+            NULL,
+            0,
+            (LPTHREAD_START_ROUTINE)((uintptr_t)hMod + (uintptr_t)hInjection),
+            lpParam ? *lpParam : NULL,
+            0,
+            NULL
+        );
+        if (hThread == NULL)
+        {
+            if (stream)
+            {
+                fprintf(
+                    stream,
+                    "9. ERROR: Cannot execute injection entry point.\n"
+                );
+            }
+            if (dwRet = libvalinet_hooking_exeinject_FreeRemoteLibrary(
+                hProcess,
+                hMod,
+                hAdrFreeLibrary,
+                stream
+            ))
+            {
+                TerminateProcess(hProcess, 0);
+                return dwRet;
+            }
+            return ERROR_CANNOT_RUN_INJECTION_MAIN;
+        }
+        WaitForSingleObject(
+            hThread,
+            INFINITE
+        );
+        bResult = GetExitCodeThread(
+            hThread,
+            &dwThreadExitCode
+        );
+        if (!bResult)
+        {
+            if (stream)
+            {
+                fprintf(
+                    stream,
+                    "9. ERROR: Cannot determine status of injected DLL.\n"
+                );
+            }
+            if (dwRet = libvalinet_hooking_exeinject_FreeRemoteLibrary(
+                hProcess,
+                hMod,
+                hAdrFreeLibrary,
+                stream
+            ))
+            {
+                TerminateProcess(hProcess, 0);
+                return dwRet;
+            }
+            return ERROR_CANNOT_DETERMINE_STATUS_DLL;
+        }
+        if (dwThreadExitCode)
+        {
+            if (lpCrashOrFailureCallback != NULL)
+            {
+                if (dwRet =
+                    lpCrashOrFailureCallback((LPVOID)dwThreadExitCode))
+                {
+                    return dwRet;
+                }
+            }
+            else
+            {
+                return dwThreadExitCode;
+            }
+        }
+        if (stream)
+        {
+            fprintf(
+                stream,
+                "9. Successfully hooked application.\n"
             );
         }
 
