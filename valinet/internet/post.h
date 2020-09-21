@@ -1,5 +1,5 @@
-#ifndef LIBVALINET_INTERNET_DOWNLOADFILE_H_
-#define LIBVALINET_INTERNET_DOWNLOADFILE_H_
+#ifndef LIBVALINET_INTERNET_POST_H_
+#define LIBVALINET_INTERNET_POST_H_
 #include <stdio.h>
 #include <Windows.h>
 #include <Wininet.h>
