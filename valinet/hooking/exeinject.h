@@ -968,10 +968,17 @@ int VnInjectAndMonitorProcess(
         }
         if (dwThreadExitCode)
         {
-            if (dwRet = 
-                lpCrashOrFailureCallback((LPVOID)dwThreadExitCode))
+            if (lpCrashOrFailureCallback != NULL)
             {
-                return dwRet;
+                if (dwRet =
+                    lpCrashOrFailureCallback((LPVOID)dwThreadExitCode))
+                {
+                    return dwRet;
+                }
+            }
+            else
+            {
+                return dwThreadExitCode;
             }
         }
         if (stream)
