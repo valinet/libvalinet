@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <Windows.h>
 #include <tlhelp32.h>
+#include <Psapi.h>
 
 #define MODULE_ARRAY_INITIAL_SIZE           100
 #define WM_APP_CRASHED                      WM_USER + 100
@@ -31,6 +32,9 @@
 #define ERROR_APP_CRASHED                   0x222
 #define ERROR_FAILED_TO_CALL_FREELIBRARY    0x500
 #define ERROR_FREELIBRARY_FAILED            0x501
+#define HOOK_CLASSIC_LOOKUP                 0x0
+#define HOOK_BY_SHELLCODE                   0x1
+#define HOOK_METHOD                         HOOK_CLASSIC_LOOKUP
 
 LRESULT CALLBACK VnWindowProc(
     HWND hWnd,
@@ -432,7 +436,7 @@ int VnInjectAndMonitorProcess(
                 {
                     if (stream)
                     {
-                        fprintf(stream, "4. Waiting for Explorer to start...\n");
+                        fprintf(stream, "4. Waiting for application to start...\n");
                     }
                 }
                 else
@@ -512,7 +516,7 @@ int VnInjectAndMonitorProcess(
             );
         }
 
-#ifdef _WIN64
+#if HOOK_METHOD == HOOK_BY_SHELLCODE && _WIN64
         // Step 6: Write shell code to application's memory
         pShellCode = VirtualAllocEx(
             hProcess,
@@ -838,7 +842,7 @@ int VnInjectAndMonitorProcess(
                 TerminateProcess(hProcess, 0);
                 return dwRet;
             }
-            return ERROR_DWM_MODULE_ENUM;
+            return ERROR_APP_MODULE_ENUM;
         }
         if (hModuleArrayInitialBytes < hModuleArrayBytesNeeded)
         {
@@ -898,7 +902,7 @@ int VnInjectAndMonitorProcess(
                     TerminateProcess(hProcess, 0);
                     return dwRet;
                 }
-                return ERROR_DWM_MODULE_ENUM;
+                return ERROR_APP_MODULE_ENUM;
             }
         }
         CharLower(szLibPath);
@@ -952,7 +956,7 @@ int VnInjectAndMonitorProcess(
                 TerminateProcess(hProcess, 0);
                 return dwRet;
             }
-            return ERROR_CANNOT_FIND_LIBRARY_IN_DWM;
+            return ERROR_CANNOT_FIND_LIBRARY_IN_APP;
         }
 
         wprintf(
