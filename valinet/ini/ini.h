@@ -124,7 +124,7 @@ UINT VnGetUInt(
         lpSection,
         lpKey,
         sz,
-        sizeof(sz),
+        sizeof(sz) / sizeof(TCHAR),
         DEF_PROFILE_NUM_LEN,
         NULL,
         m_pszPathName
