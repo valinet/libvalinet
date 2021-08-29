@@ -471,7 +471,7 @@ INT VnDownloadSymbols(
         "\\"
     );
     strcat_s(
-        szLibPath,
+        szLibPath,  
         sizeLibPath,
         pdb_info->PdbFileName
     );
@@ -493,6 +493,5 @@ INT VnDownloadSymbols(
         (char*)VN_PDB_FORM_HEADERS,
         VN_PDB_DOWNLOAD_FILE_BUFFER_SIZE
     );
-    return 0;
 }
 #endif
