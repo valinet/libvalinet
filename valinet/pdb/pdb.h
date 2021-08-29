@@ -464,6 +464,12 @@ INT VnDownloadSymbols(
         CloseHandle(hFile);
         return 7;
     }
+    PathRemoveFileSpecA(szLibPath);
+    strcat_s(
+        szLibPath,
+        sizeLibPath,
+        "\\"
+    );
     strcat_s(
         szLibPath,
         sizeLibPath,
