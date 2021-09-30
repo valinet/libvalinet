@@ -45,7 +45,7 @@ DEFINE_GUID(UIID_IXmlDocumentIO,
     0xee65, 0x4489, 0x9e, 0xbf,
     0xca, 0x43, 0xe8, 0x7b, 0xa6, 0x37
 );
-HRESULT ShowToastMessage(
+inline HRESULT ShowToastMessage(
     __x_ABI_CWindows_CData_CXml_CDom_CIXmlDocument* inputXml,
     wchar_t* pwszAppId,
     DWORD dwAppIdLength,
@@ -213,7 +213,7 @@ exit1:
     return hr;
 }
 
-HRESULT String2IXMLDocument(
+inline HRESULT String2IXMLDocument(
     wchar_t* pwszData,
     DWORD dwDataLength,
     __x_ABI_CWindows_CData_CXml_CDom_CIXmlDocument** pxmlToastMessage,

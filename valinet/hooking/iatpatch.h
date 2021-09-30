@@ -1,11 +1,12 @@
 #ifndef LIBVALINET_HOOKING_IATPATCH_H_
 #define LIBVALINET_HOOKING_IATPATCH_H_
 #include <Windows.h>
+#include <DbgHelp.h>
 #ifdef _LIBVALINET_DEBUG_HOOKING_IATPATCH
 #include <stdio.h>
 #endif
 // https://blog.neteril.org/blog/2016/12/23/diverting-functions-windows-iat-patching/
-BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t hookAddr)
+inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t hookAddr)
 {
     // Get a reference to the import table to locate the kernel32 entry
     ULONG size;
@@ -76,7 +77,7 @@ BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t hookAddr)
 }
 
 // https://stackoverflow.com/questions/50973053/how-to-hook-delay-imports
-BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t hookAddr)
+inline BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t hookAddr)
 {
     PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)lib;
     PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)((uintptr_t)lib + dos->e_lfanew);
