@@ -4,6 +4,7 @@
 #include <DbgHelp.h>
 #ifdef _LIBVALINET_DEBUG_HOOKING_IATPATCH
 #include <stdio.h>
+#include <conio.h>
 #endif
 // https://blog.neteril.org/blog/2016/12/23/diverting-functions-windows-iat-patching/
 inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t hookAddr)
@@ -28,18 +29,26 @@ inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t ho
     if (!found)
         return FALSE;
 
-    // We use this value as a comparison
-    HANDLE hMod = LoadLibraryA(libName);
-    PROC baseFunc = (PROC)GetProcAddress(GetModuleHandleA(libName), funcName);
-
     // From the kernel32 import descriptor, go over its IAT thunks to
     // find the one used by the rest of the code to call GetProcAddress
+    PIMAGE_THUNK_DATA oldthunk = (PIMAGE_THUNK_DATA)((PBYTE)module + importDescriptor->OriginalFirstThunk);
     PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)((PBYTE)module + importDescriptor->FirstThunk);
     while (thunk->u1.Function) {
         PROC* funcStorage = (PROC*)&thunk->u1.Function;
 
+        BOOL bFound = FALSE;
+        if (oldthunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+        {
+            bFound = (!(*((WORD*)&(funcName)+1)) && IMAGE_ORDINAL32(oldthunk->u1.Ordinal) == (DWORD)funcName);
+        }
+        else
+        {
+            PIMAGE_IMPORT_BY_NAME byName = (PIMAGE_IMPORT_BY_NAME)((uintptr_t)module + oldthunk->u1.AddressOfData);
+            bFound = ((*((WORD*)&(funcName)+1)) && !_stricmp((char*)byName->Name, funcName));
+        }
+
         // Found it, now let's patch it
-        if (*funcStorage == baseFunc) {
+        if (bFound) {
             // Get the memory page where the info is stored
             MEMORY_BASIC_INFORMATION mbi;
             VirtualQuery(funcStorage, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
@@ -70,9 +79,9 @@ inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t ho
         }
 
         thunk++;
+        oldthunk++;
     }
 
-    FreeLibrary(hMod);
     return FALSE;
 }
 
@@ -95,10 +104,25 @@ inline BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t 
             PIMAGE_THUNK_DATA functhunk = (PIMAGE_THUNK_DATA)((uintptr_t)lib + dload->ImportAddressTableRVA);
             while (firstthunk->u1.AddressOfData)
             {
-                if (firstthunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) {}
-                else {
+                if (firstthunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                {
+                    if (!(*((WORD*)&(funcName)+1)) && IMAGE_ORDINAL32(firstthunk->u1.Ordinal) == (DWORD)funcName)
+                    {
+                        DWORD oldProtect;
+                        VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
+                        functhunk->u1.Function = (uintptr_t)hookAddr;
+                        VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), oldProtect, &oldProtect);
+#ifdef _LIBVALINET_DEBUG_HOOKING_IATPATCH
+                        printf("[PatchDelayIAT] Patched 0x%x in %s to 0x%p.\n", funcName, libName, hookAddr);
+#endif
+                        return TRUE;
+                    }
+                }
+                else
+                {
                     PIMAGE_IMPORT_BY_NAME byName = (PIMAGE_IMPORT_BY_NAME)((uintptr_t)lib + firstthunk->u1.AddressOfData);
-                    if (!_stricmp((char*)byName->Name, funcName)) {
+                    if ((*((WORD*)&(funcName)+1)) && !_stricmp((char*)byName->Name, funcName))
+                    {
                         DWORD oldProtect;
                         VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
                         functhunk->u1.Function = (uintptr_t)hookAddr;
