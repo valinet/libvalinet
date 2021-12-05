@@ -18,7 +18,7 @@
 
 #define ASSERT(x, m, ...)                   if (!(x)) { fprintf(stderr, m, __VA_ARGS__);    \
                                                 exit(-1); }
-#define VN_PDB_ONE_MB                       (1024 * 1024)
+#define VN_PDB_ONE_MB                       (10240 * 10240)
 #define VN_PDB_ADDRESS_OFFSET               0x400000
 #define VN_PDB_SYMBOL_HOSTNAME              "msdl.microsoft.com"
 #define VN_PDB_SYMBOL_WEB                   "/download/symbols/"
