@@ -244,15 +244,6 @@ inline HRESULT String2IXMLDocument(
         }
         goto exit0;
     }
-    if (hsXmlDocumentS == NULL)
-    {
-        if (stream)
-        {
-            fprintf(stream, "%s:%d:: hJsonObjectS == NULL\n", __FUNCTION__, __LINE__);
-        }
-        hr = E_POINTER;
-        goto exit0;
-    }
 
     HSTRING_HEADER hshxmlString_h;
     HSTRING hshxmlString;
@@ -271,16 +262,7 @@ inline HRESULT String2IXMLDocument(
                 hr
             );
         }
-        goto exit0;
-    }
-    if (hshxmlString == NULL)
-    {
-        if (stream)
-        {
-            fprintf(stream, "%s:%d:: hJsonObjectS == NULL\n", __FUNCTION__, __LINE__);
-        }
-        hr = E_POINTER;
-        goto exit0;
+        goto exit1;
     }
 
     IInspectable* pInspectable = NULL;
@@ -300,7 +282,7 @@ inline HRESULT String2IXMLDocument(
             "%s:%d:: RoActivateInstance = %d\n", __FUNCTION__, __LINE__,
             hr
         );
-        goto exit0;
+        goto exit2;
     }
 
     __x_ABI_CWindows_CData_CXml_CDom_CIXmlDocumentIO* pxmlDocumentIO = NULL;
@@ -315,7 +297,7 @@ inline HRESULT String2IXMLDocument(
             "%s:%d:: QueryInterface = %d\n", __FUNCTION__, __LINE__,
             hr
         );
-        goto exit1;
+        goto exit3;
     }
 
     hr = pxmlDocumentIO->lpVtbl->LoadXml(pxmlDocumentIO, hshxmlString);
@@ -328,11 +310,15 @@ inline HRESULT String2IXMLDocument(
                 hr
             );
         }
-        goto exit1;
+        goto exit3;
     }
 
-exit1:
+exit3:
     pxmlDocumentIO->lpVtbl->Release(pxmlDocumentIO);
+exit2:
+    WindowsDeleteString(hshxmlString);
+exit1:
+    WindowsDeleteString(hsXmlDocumentS);
 exit0:
     return hr;
 }
