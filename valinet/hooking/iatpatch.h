@@ -7,8 +7,12 @@
 #include <conio.h>
 #endif
 // https://blog.neteril.org/blog/2016/12/23/diverting-functions-windows-iat-patching/
-inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t hookAddr)
+inline BOOL VnPatchIAT(HMODULE hMod, PSTR libName, PSTR funcName, uintptr_t hookAddr)
 {
+    // Increment module reference count to prevent other threads from unloading it while we're working with it
+    HMODULE module;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, hMod, &module)) return FALSE;
+
     // Get a reference to the import table to locate the kernel32 entry
     ULONG size;
     PIMAGE_IMPORT_DESCRIPTOR importDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)ImageDirectoryEntryToDataEx(module, TRUE, IMAGE_DIRECTORY_ENTRY_IMPORT, &size, NULL);
@@ -26,8 +30,10 @@ inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t ho
         }
         importDescriptor++;
     }
-    if (!found)
+    if (!found) {
+        FreeLibrary(module);
         return FALSE;
+    }
 
     // From the kernel32 import descriptor, go over its IAT thunks to
     // find the one used by the rest of the code to call GetProcAddress
@@ -54,8 +60,10 @@ inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t ho
             VirtualQuery(funcStorage, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
             // Try to change the page to be writable if it's not already
-            if (!VirtualProtect(mbi.BaseAddress, mbi.RegionSize, PAGE_READWRITE, &mbi.Protect))
+            if (!VirtualProtect(mbi.BaseAddress, mbi.RegionSize, PAGE_READWRITE, &mbi.Protect)) {
+                FreeLibrary(module);
                 return FALSE;
+            }
 
             // Store our hook
             *funcStorage = (PROC)hookAddr;
@@ -75,6 +83,7 @@ inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t ho
             VirtualProtect(mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &dwOldProtect);
 
             // Profit
+            FreeLibrary(module);
             return TRUE;
         }
 
@@ -82,12 +91,17 @@ inline BOOL VnPatchIAT(HMODULE module, PSTR libName, PSTR funcName, uintptr_t ho
         oldthunk++;
     }
 
+    FreeLibrary(module);
     return FALSE;
 }
 
 // https://stackoverflow.com/questions/50973053/how-to-hook-delay-imports
-inline BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t hookAddr)
+inline BOOL VnPatchDelayIAT(HMODULE hMod, PSTR libName, PSTR funcName, uintptr_t hookAddr)
 {
+    // Increment module reference count to prevent other threads from unloading it while we're working with it
+    HMODULE lib;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, hMod, &lib)) return FALSE;
+
     PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)lib;
     PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)((uintptr_t)lib + dos->e_lfanew);
     PIMAGE_DELAYLOAD_DESCRIPTOR dload = (PIMAGE_DELAYLOAD_DESCRIPTOR)((uintptr_t)lib +
@@ -109,13 +123,18 @@ inline BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t 
                     if (!(*((WORD*)&(funcName)+1)) && IMAGE_ORDINAL32(firstthunk->u1.Ordinal) == (DWORD)funcName)
                     {
                         DWORD oldProtect;
-                        VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
-                        functhunk->u1.Function = (uintptr_t)hookAddr;
-                        VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), oldProtect, &oldProtect);
+                        if (VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect)) 
+                        {
+                            functhunk->u1.Function = (uintptr_t)hookAddr;
+                            VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), oldProtect, &oldProtect);
 #ifdef _LIBVALINET_DEBUG_HOOKING_IATPATCH
-                        printf("[PatchDelayIAT] Patched 0x%x in %s to 0x%p.\n", funcName, libName, hookAddr);
+                            printf("[PatchDelayIAT] Patched 0x%x in %s to 0x%p.\n", funcName, libName, hookAddr);
 #endif
-                        return TRUE;
+                            FreeLibrary(lib);
+                            return TRUE;
+                        }
+                        FreeLibrary(lib);
+                        return FALSE;
                     }
                 }
                 else
@@ -124,13 +143,18 @@ inline BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t 
                     if ((*((WORD*)&(funcName)+1)) && !_stricmp((char*)byName->Name, funcName))
                     {
                         DWORD oldProtect;
-                        VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
-                        functhunk->u1.Function = (uintptr_t)hookAddr;
-                        VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), oldProtect, &oldProtect);
+                        if (VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect))
+                        {
+                            functhunk->u1.Function = (uintptr_t)hookAddr;
+                            VirtualProtect(&functhunk->u1.Function, sizeof(uintptr_t), oldProtect, &oldProtect);
 #ifdef _LIBVALINET_DEBUG_HOOKING_IATPATCH
-                        printf("[PatchDelayIAT] Patched %s in %s to 0x%p.\n", funcName, libName, hookAddr);
+                            printf("[PatchDelayIAT] Patched %s in %s to 0x%p.\n", funcName, libName, hookAddr);
 #endif
-                        return TRUE;
+                            FreeLibrary(lib);
+                            return TRUE;
+                        }
+                        FreeLibrary(lib);
+                        return FALSE;
                     }
                 }
                 functhunk++;
@@ -139,6 +163,7 @@ inline BOOL VnPatchDelayIAT(HMODULE lib, PSTR libName, PSTR funcName, uintptr_t 
         }
         dload++;
     }
+    FreeLibrary(lib);
     return FALSE;
 }
 #endif
