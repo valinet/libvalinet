@@ -32,7 +32,7 @@ inline BOOL VnGetOSVersion(PRTL_OSVERSIONINFOW lpRovi)
 }
 
 // https://stackoverflow.com/questions/47926094/detecting-windows-10-os-build-minor-version
-inline DWORD32 VnGetUBR()
+inline DWORD32 VnGetUBR(void)
 {
     DWORD32 ubr = 0, ubr_size = sizeof(DWORD32);
     HKEY hKey;
@@ -63,6 +63,7 @@ inline DWORD32 VnGetUBR()
             &ubr_size
         );
     }
+    return ubr;
 }
 
 inline DWORD32 VnGetOSVersionAndUBR(PRTL_OSVERSIONINFOW lpRovi)
