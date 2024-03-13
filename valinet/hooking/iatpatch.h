@@ -11,7 +11,7 @@ inline BOOL VnPatchIAT(HMODULE hMod, PSTR libName, PSTR funcName, uintptr_t hook
 {
     // Increment module reference count to prevent other threads from unloading it while we're working with it
     HMODULE module;
-    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, hMod, &module)) return FALSE;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)hMod, &module)) return FALSE;
 
     // Get a reference to the import table to locate the kernel32 entry
     ULONG size;
@@ -100,7 +100,7 @@ inline BOOL VnPatchDelayIAT(HMODULE hMod, PSTR libName, PSTR funcName, uintptr_t
 {
     // Increment module reference count to prevent other threads from unloading it while we're working with it
     HMODULE lib;
-    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, hMod, &lib)) return FALSE;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)hMod, &lib)) return FALSE;
 
     PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)lib;
     PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)((uintptr_t)lib + dos->e_lfanew);

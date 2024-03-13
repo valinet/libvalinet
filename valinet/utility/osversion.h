@@ -59,8 +59,8 @@ inline DWORD32 VnGetUBR(void)
             UNIFIEDBUILDREVISION_VALUE,
             0,
             NULL,
-            &ubr,
-            &ubr_size
+            (LPBYTE)&ubr,
+            (LPDWORD)&ubr_size
         );
     }
     return ubr;
