@@ -2,14 +2,19 @@
 #define LIBVALINET_UTILITY_MEMMEM_H_
 #include <stdio.h>
 #include <string.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // https://github.com/valinet/ssa/blob/master/KMP/c/kmp.c
-void* memmem(void* haystack, size_t haystacklen, void* needle, size_t needlelen)
+inline void* memmem(void* haystack, size_t haystacklen, void* needle, size_t needlelen)
 {
     const char* text = (const char*)haystack;
     const char* pattern = (const char*)needle;
     const char* rv = NULL;
 
-    size_t* out = calloc(needlelen, sizeof(size_t));
+    size_t* out = (size_t*)calloc(needlelen, sizeof(size_t));
     if (!out)
     {
         return NULL;
@@ -50,6 +55,11 @@ void* memmem(void* haystack, size_t haystacklen, void* needle, size_t needlelen)
     }
 
     free(out);
-    return rv;
+    return (void*)rv;
 }
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
