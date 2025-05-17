@@ -42,7 +42,7 @@ inline void* memmem(void* haystack, size_t haystacklen, void* needle, size_t nee
         if (text[i] == pattern[j]) {
             j++;
             if (j == needlelen) {
-                rv = text + (int)(i - needlelen + 1); //match++; j = out[j - 1];
+                rv = text + (size_t)(i - needlelen + 1); //match++; j = out[j - 1];
                 break;
             }
         }
