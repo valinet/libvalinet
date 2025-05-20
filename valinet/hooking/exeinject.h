@@ -215,7 +215,8 @@ int VnInjectAndMonitorProcess(
     int* messages,
     DWORD messagesSize,
     HWND* lphwnd,
-    LPVOID* lpParam
+    LPVOID* lpParam,
+	BOOL bOnlyActiveSID
 )
 {
     SIZE_T i = 0;
@@ -397,35 +398,51 @@ int VnInjectAndMonitorProcess(
                     if (!wcscmp(stProcessEntry.szExeFile, szProcessName))
                     {
                         dwProcessId = stProcessEntry.th32ProcessID;
-                        hProcess = OpenProcess(
-                            PROCESS_ALL_ACCESS,
-                            FALSE,
-                            dwProcessId
-                        );
-                        if (lphProcess)
-                        {
-                            *lphProcess = hProcess;
-                        }
-                        if (hProcess == NULL)
-                        {
-                            if (stream)
-                            {
-                                fprintf(
-                                    stream,
-                                    "4. ERROR: Cannot get handle to application.\n"
-                                );
-                            }
-                            return ERROR_APP_OPENPROCESS;
-                        }
-                        if (stream)
-                        {
-                            fprintf(
-                                stream,
-                                "4. Found application, PID: %d\n",
-                                dwProcessId
-                            );
-                        }
-                        break;
+                        bResult = ProcessIdToSessionId(dwProcessId, &dwSessionId);
+						if (!bResult)
+						{
+							if (stream)
+							{
+								fprintf(
+									stream,
+									"4. ERROR: Cannot get session ID from process ID.\n"
+								);
+							}
+							return ERROR_APP_OPENPROCESS;
+						}
+                        if (!bOnlyActiveSID || dwSessionId == WTSGetActiveConsoleSessionId())
+						{
+							dwProcessId = stProcessEntry.th32ProcessID;
+							hProcess = OpenProcess(
+								PROCESS_ALL_ACCESS,
+								FALSE,
+								dwProcessId
+							);
+							if (lphProcess)
+							{
+								*lphProcess = hProcess;
+							}
+							if (hProcess == NULL)
+							{
+								if (stream)
+								{
+									fprintf(
+										stream,
+										"4. ERROR: Cannot get handle to application.\n"
+									);
+								}
+								return ERROR_APP_OPENPROCESS;
+							}
+							if (stream)
+							{
+								fprintf(
+									stream,
+									"4. Found application, PID: %d\n",
+									dwProcessId
+								);
+							}
+							break;
+						}
                     }
                 }
             }
