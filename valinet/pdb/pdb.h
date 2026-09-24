@@ -182,11 +182,11 @@ int create_pools(uintptr_t base_addr)
     BOOL ok;
     FILE* in;
     int size, i;
-    const char* guide;
+    const wchar_t* guide;
 
     // Fetch PDB file for the module.
-    IMAGEHLP_MODULE64 module = { sizeof(module) };
-    ok = SymGetModuleInfo64(g_handle, base_addr, &module);
+    IMAGEHLP_MODULEW64 module = { sizeof(module) };
+    ok = SymGetModuleInfoW64(g_handle, base_addr, &module);
     if (!ok)
     {
         return 0;
@@ -201,8 +201,12 @@ int create_pools(uintptr_t base_addr)
     }
 
     // Get file size.
-    fopen_s(&in, guide, "rb");
-    ASSERT(in != NULL, "Failed to open pool-size guide file.");
+    // DbgHelp's narrow path may not use the CRT's code page. Preserve Unicode
+    // paths and report failure to the caller instead of terminating its host.
+    if (_wfopen_s(&in, guide, L"rb") != 0 || in == NULL)
+    {
+        return 0;
+    }
 
     fseek(in, 0, SEEK_END);
     size = ftell(in);
