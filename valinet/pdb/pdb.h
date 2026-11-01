@@ -182,11 +182,11 @@ int create_pools(uintptr_t base_addr)
     BOOL ok;
     FILE* in;
     int size, i;
-    const char* guide;
+    const wchar_t* guide;
 
     // Fetch PDB file for the module.
-    IMAGEHLP_MODULE64 module = { sizeof(module) };
-    ok = SymGetModuleInfo64(g_handle, base_addr, &module);
+    IMAGEHLP_MODULEW64 module = { sizeof(module) };
+    ok = SymGetModuleInfoW64(g_handle, base_addr, &module);
     if (!ok)
     {
         return 0;
@@ -195,13 +195,13 @@ int create_pools(uintptr_t base_addr)
     guide = module.LoadedPdbName;
 
     // An .exe with no symbols available?
-    if (!guide || guide[0] == '\0')
+    if (!guide || guide[0] == L'\0')
     {
         return 0;
     }
 
     // Get file size.
-    fopen_s(&in, guide, "rb");
+    _wfopen_s(&in, guide, L"rb");
     ASSERT(in != NULL, "Failed to open pool-size guide file.");
 
     fseek(in, 0, SEEK_END);
