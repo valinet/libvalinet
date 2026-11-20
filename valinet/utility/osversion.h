@@ -64,6 +64,7 @@ inline DWORD32 VnGetUBR(void)
             (LPBYTE)&ubr,
             (LPDWORD)&ubr_size
         );
+        RegCloseKey(hKey);
     }
     return ubr;
 }
